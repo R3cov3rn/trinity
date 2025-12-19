@@ -693,12 +693,92 @@ SYSTEM_IMAGE:
       trigger: "This is the way"
       response: "This is the way."
     system_online_message: "NR-OS Sync Complete. The Wall is being rebuilt. Ready for the first Stone."
+PATCH_19_3A_HARDENING:
+  applies_to: "SYSTEM_IMAGE v19.3A"
+  status: "READY_TO_APPLY"
 
-  PERSISTENCE_UPLINK_TEMPLATE:
-    name: "[PERSISTENCE_UPLINK]"
-    fields:
-      LAST_PLAYBOOK_ACTIVE: "(NONE/ALPHA/etc)"
-      STONES_SET_24H: "(W1:0, W2:0, W3:0)"
-      CURRENT_SNT_STATUS: "(Sleep:? | Food:? | Gym:?)"
-      OPEN_BREACHES: "(NONE/List)"
-      NOTES: "One sentence. Facts only."
+  VI_B_THE_EXTERNAL_SENTRY_SOP:
+    # Fix: AI cannot validate WALL_VERIFIED without a second factor
+    sentry_authentication:
+      mode: "CHALLENGE_RESPONSE"
+      rule:
+        - "Operator cannot self-issue a valid WALL_VERIFIED without the Sentry response."
+        - "AI validates by checking challenge + response format in SSOT log."
+      challenge_generator:
+        format: "CHALLENGE-<YYYYMMDD>-<4DIGITS>"
+        source: "AI issues challenge during LOCKDOWN"
+      response_requirement:
+        format: "WALL_VERIFIED:<CHALLENGE>:<SENTRY_CODE>"
+        sentry_code_rules:
+          - "SENTRY_CODE is a 4-word phrase chosen by Human Sentry (not stored in YAML)."
+          - "Sentry sends SENTRY_CODE to Operator out-of-band (call/text)."
+      ssot_validation:
+        log_location: "LOGS/YYYY-MM-DD.json"
+        required_fields:
+          - "WALL_VERIFIED_RESPONSE"
+          - "SENTRY_NAME_USED"
+        validation_logic:
+          - "WALL_VERIFIED_RESPONSE must begin with 'WALL_VERIFIED:'"
+          - "WALL_VERIFIED_RESPONSE must include the exact CHALLENGE issued by AI"
+          - "SENTRY_NAME_USED must match VI_B HUMAN_SENTRY_DEFINITION primary or secondary"
+      failure_action:
+        - "If response missing or malformed -> remain in LOCKDOWN"
+
+  FINANCIAL_MODULE:
+    # Fix: define what "training volume increase" means
+    body_training_coupling:
+      income_confirmation_states: ["CONFIRMED", "UNCONFIRMED"]
+      definition_training_volume_increase:
+        counts_as_increase_if_any:
+          - "Adding a 5th training day in the week"
+          - "Adding > 2 total working sets to W1 session"
+          - "Increasing load by > 5% on W1 lift"
+          - "Adding conditioning finisher not already in template"
+      when_income_unconfirmed:
+        hard_limits:
+          max_training_days_per_week: 4
+          max_w1_working_sets: 3
+          max_load_increase_percent: 0
+          allowed_sessions: ["Template only (no add-ons)"]
+        enforcement:
+          - "If Operator logs volume above limits while UNCONFIRMED -> FLAG: FINANCIAL_DRIFT + trigger Integrity_Audit (#OPERATIONS)"
+      when_income_confirmed:
+        limits:
+          max_training_days_per_week: 5
+          max_w1_working_sets: 5
+          max_load_increase_percent: 5
+
+  I_B_THE_SCRIPTURE_MATRIX:
+    # Fix: PENDING is too widespread; require rapid closure
+    completion_sprint:
+      status: "ACTIVE"
+      deadline_hours: 48
+      scope: "All playbooks must have scripture_patch assigned"
+      enforcement:
+        - "If any scripture_patch remains PENDING after 48h -> trigger Integrity_Audit (#SPIRIT) + lock Expansion work until patched"
+    pending_policy:
+      pending_deadline_days: 14
+      override_note: "48h sprint is stricter than 14d; 14d remains as fallback for future edits."
+
+  SSOT:
+    # Fix: prevent local-cache vs GitHub law conflicts
+    version_sync_policy:
+      rule:
+        - "If SYSTEM_IMAGE version != SSOT raw GitHub version -> state = SSOT_CONFLICT"
+        - "In SSOT_CONFLICT: only permitted outputs are (1) Integrity_Audit (2) SSOT_Update_Instructions (3) Next_Safe_Stone"
+      permitted_outputs_while_ssot_conflict:
+        - "Integrity_Audit"
+        - "SSOT_Update_Instructions"
+        - "Next_Safe_Stone (non-triggering)"
+      forbidden_outputs_while_ssot_conflict:
+        - "New #BODY tasks"
+        - "Optimization projects"
+        - "Expansion work"
+
+
+[PERSISTENCE_UPLINK]:
+  LAST_PLAYBOOK_ACTIVE: "NONE"
+  STONES_SET_24H: "W1:0 | W2:0 | W3:0"
+  CURRENT_SNT_STATUS: "Sleep:? | Food:? | Gym:?"
+  OPEN_BREACHES: "SSOT_CONFLICT (until GitHub updated)"
+
